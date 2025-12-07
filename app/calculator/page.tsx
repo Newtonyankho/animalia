@@ -128,7 +128,7 @@ const Calculator = () => {
 
         // Handle functions: SUM, AVERAGE, IF
         formula = formula.replace(/(SUM|AVERAGE|IF)\(([^)]+)\)/g, (match, funcName, argsStr) => {
-          const args = argsStr.split(',').map((a) => a.trim());
+          const args: string[] = argsStr.split(',').map((a: string) => a.trim());
 
           if (funcName === 'SUM' || funcName === 'AVERAGE') {
             const rangeCells = parseRange(args[0], ROWS, COLS);

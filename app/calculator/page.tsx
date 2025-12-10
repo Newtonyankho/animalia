@@ -1,7 +1,7 @@
-// app/calculator/page.tsx
+// /home/newton/projects/myava/frontend/app/calculator/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 // Types
@@ -13,8 +13,7 @@ type Cell = {
 
 // Utility Functions
 const colToLetter = (c: number): string => {
-  let temp: number;
-  let letter = '';
+  let temp, letter = '';
   while (c >= 0) {
     temp = c % 26;
     letter = String.fromCharCode(temp + 65) + letter;
@@ -66,7 +65,7 @@ const parseRange = (rangeStr: string, ROWS: number, COLS: number): { row: number
   return cellsInGrid;
 };
 
-const Calculator: React.FC = () => {
+const Calculator = () => {
   const ROWS = 10;
   const COLS = 5;
 
@@ -79,29 +78,36 @@ const Calculator: React.FC = () => {
 
   // Initialize empty grid
   useEffect(() => {
-    const initialCells: Cell[][] = Array.from({ length: ROWS }).map(() =>
-      Array.from({ length: COLS }).map(() => ({
-        input: '',
-        value: '',
-        dependents: new Set<string>(),
-      }))
-    );
+    const initialCells: Cell[][] = Array(ROWS)
+      .fill(null)
+      .map(() =>
+        Array(COLS)
+          .fill(null)
+          .map(() => ({
+            input: '',
+            value: '',
+            dependents: new Set(),
+          }))
+      );
     setCells(initialCells);
   }, []);
 
   // Cleanup dependencies
-  const cleanupDependencies = useCallback((row: number, col: number) => {
-    setCells((prev) => {
-      const newCells = prev.map((r) =>
-        r.map((cell) => ({
-          ...cell,
-          dependents: new Set<string>([...cell.dependents].filter((d) => d !== toA1(row, col))),
-        }))
-      );
-      newCells[row][col].dependents = new Set<string>();
-      return newCells;
-    });
-  }, []);
+  const cleanupDependencies = useCallback(
+    (row: number, col: number) => {
+      setCells((prev) => {
+        const newCells = prev.map((r) =>
+          r.map((cell) => ({
+            ...cell,
+            dependents: new Set([...cell.dependents].filter((d) => d !== toA1(row, col))),
+          }))
+        );
+        newCells[row][col].dependents = new Set();
+        return newCells;
+      });
+    },
+    []
+  );
 
   // Recalculate a single cell
   const calculateCell = useCallback(
@@ -111,7 +117,6 @@ const Calculator: React.FC = () => {
 
       cleanupDependencies(row, col);
 
-      // If not a formula, parse to number or return raw string
       if (!input.startsWith('=')) {
         const num = parseFloat(input);
         return isNaN(num) ? input : num;
@@ -122,144 +127,124 @@ const Calculator: React.FC = () => {
         const references: string[] = [];
 
         // Handle functions: SUM, AVERAGE, IF
-        formula = formula.replace(
-          /(SUM|AVERAGE|IF)\(([^)]+)\)/g,
-          (match: string, funcName: string, argsStr: string): string => {
-            const args: string[] = argsStr.split(',').map((a: string) => a.trim());
+        formula = formula.replace(/(SUM|AVERAGE|IF)\(([^)]+)\)/g, (match, funcName, argsStr) => {
+          const args = argsStr.split(',').map((a) => a.trim());
 
-            if (funcName === 'SUM' || funcName === 'AVERAGE') {
-              const rangeCells = parseRange(args[0], ROWS, COLS);
-              let sum = 0;
-              let count = 0;
-              rangeCells.forEach(({ row: r, col: c }) => {
-                references.push(toA1(r, c));
-                const val = currentCells[r][c].value;
-                if (typeof val === 'number') {
-                  sum += val;
-                  count++;
-                } else {
-                  const maybeNum = parseFloat(String(val));
-                  if (!isNaN(maybeNum)) {
-                    sum += maybeNum;
-                    count++;
-                  }
-                }
-              });
-
-              const resultNum = funcName === 'SUM' ? sum : count > 0 ? sum / count : 0;
-              return String(resultNum); // always string for replace callback
-            }
-
-            if (funcName === 'IF') {
-              if (args.length !== 3) throw new Error('Invalid IF arguments');
-              const conditionStr = args[0].trim();
-              let resultBool: boolean = false;
-
-              const comparisonMatch = conditionStr.match(/^([A-Z]+\d+)\s*([<>=!]+)\s*(.+)$/);
-              if (comparisonMatch) {
-                const refA1 = comparisonMatch[1];
-                const operator = comparisonMatch[2];
-                const targetStr = comparisonMatch[3];
-                const coord = fromA1(refA1);
-                if (!coord) throw new Error('#REF!');
-                references.push(refA1);
-                const left = currentCells[coord.row][coord.col].value;
-
-                let right: any;
-                if (/^[A-Z]+\d+$/i.test(targetStr)) {
-                  const targetCoord = fromA1(targetStr);
-                  if (!targetCoord) throw new Error('#REF!');
-                  references.push(targetStr);
-                  right = currentCells[targetCoord.row][targetCoord.col].value;
-                } else {
-                  const num = parseFloat(targetStr);
-                  right = isNaN(num) ? targetStr.replace(/"/g, '') : num;
-                }
-
-                switch (operator) {
-                  case '>':
-                    resultBool = (left as any) > right;
-                    break;
-                  case '<':
-                    resultBool = (left as any) < right;
-                    break;
-                  case '=':
-                    resultBool = (left as any) == right;
-                    break;
-                  case '!=':
-                    resultBool = (left as any) != right;
-                    break;
-                  default:
-                    resultBool = false;
-                }
-              } else {
-                const coord = fromA1(conditionStr);
-                if (coord) {
-                  references.push(conditionStr);
-                  const val = currentCells[coord.row][coord.col].value;
-                  resultBool = typeof val === 'number' ? val !== 0 : Boolean(val);
-                } else {
-                  resultBool = false;
-                }
+          if (funcName === 'SUM' || funcName === 'AVERAGE') {
+            const rangeCells = parseRange(args[0], ROWS, COLS);
+            let sum = 0;
+            let count = 0;
+            rangeCells.forEach(({ row: r, col: c }) => {
+              references.push(toA1(r, c));
+              const val = currentCells[r][c].value;
+              if (typeof val === 'number') {
+                sum += val;
+                count++;
               }
-
-              const chosenArg = resultBool ? args[1] : args[2];
-              const returnCoord = fromA1(chosenArg);
-              if (returnCoord) {
-                references.push(chosenArg);
-                return String(currentCells[returnCoord.row][returnCoord.col].value);
-              }
-
-              const num = parseFloat(chosenArg);
-              return isNaN(num) ? chosenArg.replace(/"/g, '') : String(num);
-            }
-
-            return match;
+            });
+            return funcName === 'SUM' ? sum : count > 0 ? sum / count : 0;
           }
-        );
 
-        // Resolve cell references (replace each A1 with its numeric value or 0)
-        formula = formula.replace(/([A-Z]+\d+)/g, (match: string): string => {
+          if (funcName === 'IF') {
+            if (args.length !== 3) throw new Error('Invalid IF arguments');
+            const conditionStr = args[0].trim();
+            let result: boolean;
+
+            const comparisonMatch = conditionStr.match(/^([A-Z]+\d+)\s*([<>=!]+)\s*(.+)$/);
+            if (comparisonMatch) {
+              const refA1 = comparisonMatch[1];
+              const operator = comparisonMatch[2];
+              const targetStr = comparisonMatch[3];
+              const coord = fromA1(refA1);
+              if (!coord) throw new Error('#REF!');
+              references.push(refA1);
+              const left = currentCells[coord.row][coord.col].value;
+
+              let right: any;
+              if (targetStr.match(/^[A-Z]+\d+$/)) {
+                const targetCoord = fromA1(targetStr);
+                if (!targetCoord) throw new Error('#REF!');
+                references.push(targetStr);
+                right = currentCells[targetCoord.row][targetCoord.col].value;
+              } else {
+                const num = parseFloat(targetStr);
+                right = isNaN(num) ? targetStr.replace(/"/g, '') : num;
+              }
+
+              switch (operator) {
+                case '>':
+                  result = left > right;
+                  break;
+                case '<':
+                  result = left < right;
+                  break;
+                case '=':
+                  result = left == right;
+                  break;
+                case '!=':
+                  result = left != right;
+                  break;
+                default:
+                  result = false;
+              }
+            } else {
+              const coord = fromA1(conditionStr);
+              if (coord) {
+                references.push(conditionStr);
+                const val = currentCells[coord.row][coord.col].value;
+                result = typeof val === 'number' && val !== 0;
+              } else {
+                result = false;
+              }
+            }
+
+            const returnArg = result ? args[1] : args[2];
+            const returnCoord = fromA1(returnArg);
+            if (returnCoord) {
+              references.push(returnArg);
+              return currentCells[returnCoord.row][returnCoord.col].value;
+            }
+            const num = parseFloat(returnArg);
+            return isNaN(num) ? returnArg.replace(/"/g, '') : num;
+          }
+
+          return match;
+        });
+
+        // Resolve cell references
+        formula = formula.replace(/([A-Z]+\d+)/g, (match) => {
           const coord = fromA1(match);
           if (!coord) throw new Error('#REF!');
           references.push(match);
           const val = currentCells[coord.row][coord.col].value;
-          // If number, return as stringified number, otherwise attempt to parse numeric value
-          if (typeof val === 'number') return String(val);
-          const maybeNum = parseFloat(String(val));
-          return isNaN(maybeNum) ? '0' : String(maybeNum);
+          return typeof val === 'number' ? val : 0;
         });
 
-        // Add dependencies (cells that this cell depends on should record this cell as dependent)
+        // Add dependencies
         setCells((prev) => {
-          const updated = prev.map((r) => r.map((c) => ({ ...c, dependents: new Set<string>(c.dependents) })));
+          const updated = [...prev];
           references.forEach((ref) => {
-            const coord = fromA1(ref);
-            if (!coord) return;
+            const coord = fromA1(ref)!;
             updated[coord.row][coord.col].dependents.add(toA1(row, col));
           });
           return updated;
         });
 
-        // Evaluate (use Function for slightly safer eval than global eval)
-        // Only arithmetic expressions should remain at this point (numbers and operators).
-        // We still guard in try/catch above.
-        // eslint-disable-next-line no-new-func
-        const resultRaw = Function(`"use strict"; return (${formula});`)();
-        const result = typeof resultRaw === 'number' ? parseFloat(resultRaw.toFixed(4)) : resultRaw;
-        return result;
+        // Evaluate (safe eval for prototype)
+        const result = eval(formula);
+        return typeof result === 'number' ? parseFloat(result.toFixed(4)) : result;
       } catch (e) {
         return '#ERROR!';
       }
     },
-    [cleanupDependencies]
+    [ROWS, COLS, cleanupDependencies]
   );
 
   // Update cell and propagate
   const updateCell = useCallback(
     (row: number, col: number) => {
       setCells((prev) => {
-        const newCells = prev.map((r) => r.map((c) => ({ ...c, dependents: new Set<string>(c.dependents) })));
+        const newCells = [...prev];
         const value = calculateCell(row, col, newCells);
         newCells[row][col] = { ...newCells[row][col], value };
         return newCells;
@@ -268,9 +253,9 @@ const Calculator: React.FC = () => {
       // Recalculate dependents (simple BFS)
       setTimeout(() => {
         setCells((prev) => {
-          const queue: string[] = [...prev[row][col].dependents];
+          const queue = [...prev[row][col].dependents];
           const visited = new Set<string>();
-          const newCells = prev.map((r) => r.map((c) => ({ ...c, dependents: new Set<string>(c.dependents) })));
+          const newCells = [...prev];
 
           while (queue.length > 0) {
             const depA1 = queue.shift()!;
@@ -284,7 +269,7 @@ const Calculator: React.FC = () => {
             newCells[coord.row][coord.col] = { ...newCells[coord.row][coord.col], value: newValue };
 
             // Add its dependents to queue
-            queue.push(...Array.from(newCells[coord.row][coord.col].dependents));
+            queue.push(...newCells[coord.row][coord.col].dependents);
           }
 
           return newCells;
@@ -298,7 +283,7 @@ const Calculator: React.FC = () => {
   const handleInput = () => {
     const { row, col } = activeCell;
     setCells((prev) => {
-      const newCells = prev.map((r) => r.map((c) => ({ ...c, dependents: new Set<string>(c.dependents) })));
+      const newCells = [...prev];
       newCells[row][col] = { ...newCells[row][col], input: formulaInput };
       return newCells;
     });
